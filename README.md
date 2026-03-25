@@ -393,6 +393,57 @@ docker run --name new-api -d --restart always \
 > - **Must set** `SESSION_SECRET` - Otherwise login status inconsistent
 > - **Shared Redis must set** `CRYPTO_SECRET` - Otherwise data cannot be decrypted
 
+### 🔀 Reverse Proxy Configuration (Nginx)
+
+If you deploy new-api behind a reverse proxy (Nginx, Caddy, Cloudflare, etc.), special configuration is required for the **Server-Sent Events (SSE) endpoint** used by the channel session limits dashboard.
+
+The SSE endpoint (`/api/channel/session_limits/stream`) streams real-time session data to the frontend. If the reverse proxy buffers or compresses the response, the stream will appear unresponsive (showing `--` instead of active session counts).
+
+**Nginx configuration:**
+
+```nginx
+# SSE endpoint — exact match, must be before the generic location
+location = /api/channel/session_limits/stream {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_cache off;
+    gzip off;
+    proxy_set_header Accept-Encoding "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_hide_header X-Accel-Buffering;
+    proxy_set_header Connection "";
+}
+
+# Generic location
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+**Key settings explained:**
+
+| Directive | Reason |
+|-----------|--------|
+| `proxy_buffering off` | Prevents nginx from buffering the SSE stream |
+| `proxy_request_buffering off` | Prevents buffering on the request side |
+| `gzip off` + `proxy_set_header Accept-Encoding ""` | SSE data must not be compressed or the stream breaks |
+| `proxy_http_version 1.1` | HTTP/1.1 is required for chunked transfer |
+| `proxy_hide_header X-Accel-Buffering` | Removes buffering header set by the backend |
+| `location =` (exact match) | Ensures this location takes priority over generic `/` |
+
+> [!NOTE]
+> If you use **Cloudflare CDN** in front of Nginx, you may also need to set a Cache Rule to **Bypass** for the `/api/channel/session_limits/stream` path, as Cloudflare can independently buffer SSE responses.
+
 ### 🔄 Channel Retry and Cache
 
 **Retry configuration:** `Settings → Operation Settings → General Settings → Failure Retry Count`
