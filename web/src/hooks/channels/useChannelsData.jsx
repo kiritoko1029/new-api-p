@@ -36,6 +36,7 @@ import {
 import { useIsMobile } from '../common/useIsMobile';
 import { useTableCompactMode } from '../common/useTableCompactMode';
 import { useChannelUpstreamUpdates } from './useChannelUpstreamUpdates';
+import { useClaudeChannelSessionStream } from './useClaudeChannelSessionStream';
 import { parseUpstreamUpdateMeta } from './upstreamUpdateUtils';
 import { Modal, Button } from '@douyinfe/semi-ui';
 import { openCodexUsageModal } from '../../components/table/channels/modals/CodexUsageModal';
@@ -136,6 +137,7 @@ export const useChannelsData = () => {
     GROUP: 'group',
     TYPE: 'type',
     STATUS: 'status',
+    SESSION: 'session',
     RESPONSE_TIME: 'response_time',
     BALANCE: 'balance',
     PRIORITY: 'priority',
@@ -176,6 +178,7 @@ export const useChannelsData = () => {
       [COLUMN_KEYS.GROUP]: true,
       [COLUMN_KEYS.TYPE]: true,
       [COLUMN_KEYS.STATUS]: true,
+      [COLUMN_KEYS.SESSION]: true,
       [COLUMN_KEYS.RESPONSE_TIME]: true,
       [COLUMN_KEYS.BALANCE]: true,
       [COLUMN_KEYS.PRIORITY]: true,
@@ -438,6 +441,28 @@ export const useChannelsData = () => {
   };
 
   const upstreamUpdates = useChannelUpstreamUpdates({ t, refresh });
+  const claudeChannelIds = useMemo(() => {
+    const ids = [];
+    channels.forEach((channel) => {
+      if (Array.isArray(channel?.children)) {
+        channel.children.forEach((child) => {
+          if (Number(child?.type) === 14) {
+            ids.push(child.id);
+          }
+        });
+        return;
+      }
+      if (Number(channel?.type) === 14) {
+        ids.push(channel.id);
+      }
+    });
+    return ids;
+  }, [channels]);
+  const { sessionStateMap: channelSessionStateMap } =
+    useClaudeChannelSessionStream({
+      channelIds: claudeChannelIds,
+      enabled: claudeChannelIds.length > 0,
+    });
 
   // Channel management
   const manageChannel = async (id, action, record, value) => {
@@ -1146,6 +1171,7 @@ export const useChannelsData = () => {
     statusFilter,
     compactMode,
     globalPassThroughEnabled,
+    channelSessionStateMap,
 
     // UI states
     showEdit,

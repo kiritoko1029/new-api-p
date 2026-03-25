@@ -40,6 +40,8 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateLastDetectedModels []string      `json:"upstream_model_update_last_detected_models,omitempty"` // 上次检测到的可加入模型
 	UpstreamModelUpdateLastRemovedModels  []string      `json:"upstream_model_update_last_removed_models,omitempty"`  // 上次检测到的可删除模型
 	UpstreamModelUpdateIgnoredModels      []string      `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
+	ClaudeMaxSessions                     *int          `json:"claude_max_sessions,omitempty"`                        // Claude 最大并发会话数 (0/nil = 不限制)
+	ClaudeSessionTTLMinutes               *int          `json:"claude_session_ttl_minutes,omitempty"`                 // Claude 会话不活动超时分钟数 (默认 30)
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {
@@ -47,4 +49,22 @@ func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {
 		return false
 	}
 	return *s.OpenRouterEnterprise
+}
+
+// GetClaudeMaxSessions returns the configured max concurrent sessions for Claude channels.
+// Returns 0 (unlimited) if not configured or value is non-positive.
+func (s *ChannelOtherSettings) GetClaudeMaxSessions() int {
+	if s == nil || s.ClaudeMaxSessions == nil || *s.ClaudeMaxSessions <= 0 {
+		return 0
+	}
+	return *s.ClaudeMaxSessions
+}
+
+// GetClaudeSessionTTLMinutes returns the session inactivity TTL in minutes.
+// Defaults to 30 minutes if not configured or value is non-positive.
+func (s *ChannelOtherSettings) GetClaudeSessionTTLMinutes() int {
+	if s == nil || s.ClaudeSessionTTLMinutes == nil || *s.ClaudeSessionTTLMinutes <= 0 {
+		return 30
+	}
+	return *s.ClaudeSessionTTLMinutes
 }

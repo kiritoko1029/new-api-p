@@ -235,6 +235,7 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.GET("/:id/codex/usage", controller.GetCodexChannelUsage)
 			channelRoute.POST("/ollama/pull", controller.OllamaPullModel)
 			channelRoute.POST("/ollama/pull/stream", controller.OllamaPullModelStream)
+			channelRoute.GET("/session_limits/stream", controller.StreamChannelSessionStates)
 			channelRoute.DELETE("/ollama/delete", controller.OllamaDeleteModel)
 			channelRoute.GET("/ollama/version/:id", controller.OllamaVersion)
 			channelRoute.POST("/batch/tag", controller.BatchSetChannelTag)

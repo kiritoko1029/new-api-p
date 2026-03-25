@@ -173,6 +173,112 @@ func GetAllChannels(c *gin.Context) {
 	return
 }
 
+func StreamChannelSessionStates(c *gin.Context) {
+	channelIDs, err := parseChannelSessionStreamIDs(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	includeDetails, _ := strconv.ParseBool(c.DefaultQuery("details", "false"))
+	initialPayload, err := service.BuildClaudeChannelSessionStreamPayload(channelIDs, includeDetails)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "streaming is not supported",
+		})
+		return
+	}
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Status(http.StatusOK)
+
+	writePayload := func(payload service.ChannelSessionStreamPayload) bool {
+		raw, marshalErr := common.Marshal(payload)
+		if marshalErr != nil {
+			common.SysError("failed to marshal channel session payload: " + marshalErr.Error())
+			return false
+		}
+		if _, writeErr := c.Writer.Write([]byte("data: " + string(raw) + "\n\n")); writeErr != nil {
+			return false
+		}
+		flusher.Flush()
+		return true
+	}
+
+	if !writePayload(initialPayload) {
+		return
+	}
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case <-ticker.C:
+			payload, payloadErr := service.BuildClaudeChannelSessionStreamPayload(channelIDs, includeDetails)
+			if payloadErr != nil {
+				common.SysError("failed to build channel session payload: " + payloadErr.Error())
+				return
+			}
+			if !writePayload(payload) {
+				return
+			}
+		}
+	}
+}
+
+func parseChannelSessionStreamIDs(c *gin.Context) ([]int, error) {
+	if rawChannelID := strings.TrimSpace(c.Query("channel_id")); rawChannelID != "" {
+		channelID, err := strconv.Atoi(rawChannelID)
+		if err != nil || channelID <= 0 {
+			return nil, fmt.Errorf("invalid channel_id")
+		}
+		return []int{channelID}, nil
+	}
+
+	rawChannelIDs := strings.TrimSpace(c.Query("channel_ids"))
+	if rawChannelIDs == "" {
+		return nil, nil
+	}
+
+	seen := make(map[int]struct{})
+	channelIDs := make([]int, 0)
+	for _, item := range strings.Split(rawChannelIDs, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		channelID, err := strconv.Atoi(item)
+		if err != nil || channelID <= 0 {
+			return nil, fmt.Errorf("invalid channel_ids")
+		}
+		if _, ok := seen[channelID]; ok {
+			continue
+		}
+		seen[channelID] = struct{}{}
+		channelIDs = append(channelIDs, channelID)
+	}
+	return channelIDs, nil
+}
+
 func buildFetchModelsHeaders(channel *model.Channel, key string) (http.Header, error) {
 	var headers http.Header
 	switch channel.Type {

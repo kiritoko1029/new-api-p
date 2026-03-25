@@ -65,4 +65,7 @@ const (
 
 	// ContextKeyLanguage stores the user's language preference for i18n
 	ContextKeyLanguage ContextKey = "language"
+
+	// ContextKeySessionId stores the computed session identifier for session limiting
+	ContextKeySessionId ContextKey = "session_id"
 )

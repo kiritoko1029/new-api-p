@@ -253,6 +253,72 @@ const renderResponseTime = (responseTime, t) => {
   }
 };
 
+const renderSessionSummary = (record, channelSessionStateMap, t) => {
+  if (record?.children !== undefined) {
+    return (
+      <Tag color='grey' type='ghost' shape='circle'>
+        -
+      </Tag>
+    );
+  }
+
+  if (Number(record?.type) !== 14) {
+    return (
+      <Tag color='grey' type='ghost' shape='circle'>
+        -
+      </Tag>
+    );
+  }
+
+  const sessionState = channelSessionStateMap?.[record.id];
+  if (!sessionState) {
+    return (
+      <Tag color='grey' shape='circle'>
+        --
+      </Tag>
+    );
+  }
+
+  const activeSessions = Number(sessionState.active_sessions) || 0;
+  const maxSessions = Number(sessionState.max_sessions) || 0;
+  const ttlMinutes = Number(sessionState.ttl_minutes) || 30;
+  let color = 'blue';
+  if (maxSessions > 0 && activeSessions >= maxSessions) {
+    color = 'red';
+  } else if (
+    maxSessions > 0 &&
+    activeSessions >= Math.max(1, maxSessions - 1)
+  ) {
+    color = 'yellow';
+  } else if (maxSessions > 0) {
+    color = 'green';
+  }
+
+  return (
+    <Tooltip
+      content={
+        maxSessions > 0
+          ? t('当前活跃会话 {{active}}/{{max}}，超时 {{ttl}} 分钟', {
+              active: activeSessions,
+              max: maxSessions,
+              ttl: ttlMinutes,
+            })
+          : t('当前活跃会话 {{active}}，未设置上限，超时 {{ttl}} 分钟', {
+              active: activeSessions,
+              ttl: ttlMinutes,
+            })
+      }
+      position='top'
+    >
+      <Tag color={color} shape='circle'>
+        {maxSessions > 0
+          ? `${activeSessions}/${maxSessions}`
+          : t('{{active}}/不限', { active: activeSessions })}
+      </Tag>
+    </Tooltip>
+  );
+};
+
 const isRequestPassThroughEnabled = (record) => {
   if (!record || record.children !== undefined) {
     return false;
@@ -322,6 +388,7 @@ export const getChannelsColumns = ({
   refresh,
   activePage,
   channels,
+  channelSessionStateMap,
   checkOllamaVersion,
   setShowMultiKeyManageModal,
   setCurrentMultiKeyChannel,
@@ -515,6 +582,13 @@ export const getChannelsColumns = ({
           return renderStatus(text, record.channel_info, t);
         }
       },
+    },
+    {
+      key: COLUMN_KEYS.SESSION,
+      title: t('会话'),
+      dataIndex: 'id',
+      render: (text, record) =>
+        renderSessionSummary(record, channelSessionStateMap, t),
     },
     {
       key: COLUMN_KEYS.RESPONSE_TIME,

@@ -297,21 +297,50 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 			AutoBan: &autoBanInt,
 		}, nil
 	}
-	channel, selectGroup, err := service.CacheGetRandomSatisfiedChannel(retryParam)
+
+	// Session limit awareness for Claude channels during retry
+	sessionID := common.GetContextKeyString(c, constant.ContextKeySessionId)
+	maxRetries := 10
+	var channel *model.Channel
+	var selectGroup string
+	var err error
+
+	for retry := retryParam.GetRetry(); retry < maxRetries; retry++ {
+		channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
+			Ctx:        c,
+			ModelName:  info.OriginModelName,
+			TokenGroup: retryParam.TokenGroup,
+			Retry:      common.GetPointer(retry),
+		})
+		if err != nil {
+			return nil, types.NewError(fmt.Errorf("获取分组 %s 下模型 %s 的可用渠道失败（retry）: %s", selectGroup, info.OriginModelName, err.Error()), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+		}
+		if channel == nil {
+			return nil, types.NewError(fmt.Errorf("分组 %s 下模型 %s 的可用渠道不存在（retry）", selectGroup, info.OriginModelName), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+		}
+		if middleware.IsChannelSessionBlocked(c, channel, sessionID) {
+			return nil, middleware.NewChannelSessionLimitError(c, channel)
+		}
+		break
+	}
 
 	info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
-
-	if err != nil {
-		return nil, types.NewError(fmt.Errorf("获取分组 %s 下模型 %s 的可用渠道失败（retry）: %s", selectGroup, info.OriginModelName, err.Error()), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
-	}
-	if channel == nil {
-		return nil, types.NewError(fmt.Errorf("分组 %s 下模型 %s 的可用渠道不存在（retry）", selectGroup, info.OriginModelName), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
-	}
 
 	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, info.OriginModelName)
 	if newAPIError != nil {
 		return nil, newAPIError
 	}
+
+	// Register session on new channel after successful selection
+	if sessionID != "" && channel.Type == constant.ChannelTypeAnthropic {
+		otherSettings := channel.GetOtherSettings()
+		if otherSettings.GetClaudeMaxSessions() > 0 {
+			if regErr := service.RegisterOrUpdateSession(channel.Id, sessionID); regErr != nil {
+				common.SysError(fmt.Sprintf("failed to register session for channel %d during retry: %v", channel.Id, regErr))
+			}
+		}
+	}
+
 	return channel, nil
 }
 
@@ -320,6 +349,9 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 		return false
 	}
 	if service.ShouldSkipRetryAfterChannelAffinityFailure(c) {
+		return false
+	}
+	if openaiErr.GetErrorCode() == types.ErrorCodeChannelSessionLimitReached {
 		return false
 	}
 	if types.IsChannelError(openaiErr) {

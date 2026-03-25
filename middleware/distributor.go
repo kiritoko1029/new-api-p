@@ -51,6 +51,12 @@ func Distribute() func(c *gin.Context) {
 				abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorChannelDisabled))
 				return
 			}
+			sessionID := extractSessionIdFromContext(c)
+			if isChannelSessionBlocked(c, channel, sessionID) {
+				sessionErr := newChannelSessionLimitError(c, channel)
+				abortWithOpenAiMessage(c, sessionErr.StatusCode, sessionErr.Error(), sessionErr.GetErrorCode())
+				return
+			}
 		} else {
 			// Select a channel for the user
 			// check token model mapping
@@ -81,6 +87,10 @@ func Distribute() func(c *gin.Context) {
 				}
 				var selectGroup string
 				usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
+
+				// Pre-extract session ID for Claude session limiting
+				sessionID := extractSessionIdFromContext(c)
+
 				// check path is /pg/chat/completions
 				if strings.HasPrefix(c.Request.URL.Path, "/pg/chat/completions") {
 					playgroundRequest := &dto.PlayGroundRequest{}
@@ -107,6 +117,10 @@ func Distribute() func(c *gin.Context) {
 								abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorChannelDisabled))
 								return
 							}
+						} else if isChannelSessionBlocked(c, preferred, sessionID) {
+							sessionErr := newChannelSessionLimitError(c, preferred)
+							abortWithOpenAiMessage(c, sessionErr.StatusCode, sessionErr.Error(), sessionErr.GetErrorCode())
+							return
 						} else if usingGroup == "auto" {
 							userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 							autoGroups := service.GetUserAutoGroup(userGroup)
@@ -128,13 +142,14 @@ func Distribute() func(c *gin.Context) {
 				}
 
 				if channel == nil {
-					channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
-						Ctx:        c,
-						ModelName:  modelRequest.Model,
-						TokenGroup: usingGroup,
-						Retry:      common.GetPointer(0),
-					})
+					// Try channels with session limit awareness
+					channel, selectGroup, err = selectChannelWithSessionCheck(c, modelRequest.Model, usingGroup, sessionID)
 					if err != nil {
+						var apiErr *types.NewAPIError
+						if errors.As(err, &apiErr) {
+							abortWithOpenAiMessage(c, apiErr.StatusCode, apiErr.Error(), apiErr.GetErrorCode())
+							return
+						}
 						showGroup := usingGroup
 						if usingGroup == "auto" {
 							showGroup = fmt.Sprintf("auto(%s)", selectGroup)
@@ -160,6 +175,8 @@ func Distribute() func(c *gin.Context) {
 		c.Next()
 		if channel != nil && c.Writer != nil && c.Writer.Status() < http.StatusBadRequest {
 			service.RecordChannelAffinity(c, channel.Id)
+			// Register/update session for Claude channels with session limiting
+			registerSessionIfNeeded(c, channel)
 		}
 	}
 }
@@ -432,4 +449,145 @@ func extractModelNameFromGeminiPath(path string) string {
 
 	// 返回模型名部分
 	return path[startIndex : startIndex+colonIndex]
+}
+
+// --- Session limiting helpers ---
+
+const maxSessionRetryLevels = 10
+
+// extractSessionIdFromContext extracts and caches a session ID from the request body.
+// The session ID is stored in the Gin context for reuse by downstream components.
+func extractSessionIdFromContext(c *gin.Context) string {
+	if sid, ok := c.Get(string(constant.ContextKeySessionId)); ok {
+		if s, ok := sid.(string); ok {
+			return s
+		}
+	}
+	// Read raw body from storage (does not consume it)
+	storage, err := common.GetBodyStorage(c)
+	if err != nil || storage == nil {
+		return ""
+	}
+	body, err := storage.Bytes()
+	if err != nil || len(body) == 0 {
+		return ""
+	}
+	tokenID := common.GetContextKeyInt(c, constant.ContextKeyTokenId)
+	sessionID, ok := service.ExtractSessionInfo(body, tokenID)
+	if ok {
+		common.SetContextKey(c, constant.ContextKeySessionId, sessionID)
+	}
+	return sessionID
+}
+
+// isChannelSessionBlocked checks if a channel should be skipped due to session limits.
+// Returns true only for NEW sessions on channels that have reached their max session count.
+// Existing (continuation) sessions are always allowed.
+func isChannelSessionBlocked(c *gin.Context, ch *model.Channel, sessionID string) bool {
+	if sessionID == "" || ch.Type != constant.ChannelTypeAnthropic {
+		return false
+	}
+	otherSettings := ch.GetOtherSettings()
+	maxSessions := otherSettings.GetClaudeMaxSessions()
+	if maxSessions <= 0 {
+		return false
+	}
+	ttlMinutes := otherSettings.GetClaudeSessionTTLMinutes()
+	// If this is an existing (continuation) session, allow it
+	if service.IsSessionActive(ch.Id, sessionID, ttlMinutes) {
+		return false
+	}
+	// New session: check if channel is full
+	return service.IsChannelSessionFull(ch.Id, maxSessions, ttlMinutes)
+}
+
+func newChannelSessionLimitError(c *gin.Context, ch *model.Channel) *types.NewAPIError {
+	otherSettings := ch.GetOtherSettings()
+	maxSessions := otherSettings.GetClaudeMaxSessions()
+	message := i18n.T(c, i18n.MsgChannelSessionLimitReached, map[string]any{
+		"ChannelName": ch.Name,
+		"MaxSessions": maxSessions,
+	})
+	return types.WithOpenAIError(types.OpenAIError{
+		Message: message,
+		Type:    string(types.ErrorCodeChannelSessionLimitReached),
+		Code:    types.ErrorCodeChannelSessionLimitReached,
+	}, http.StatusTooManyRequests, types.ErrOptionWithSkipRetry())
+}
+
+func NewChannelSessionLimitError(c *gin.Context, ch *model.Channel) *types.NewAPIError {
+	return newChannelSessionLimitError(c, ch)
+}
+
+func IsChannelSessionBlocked(c *gin.Context, ch *model.Channel, sessionID string) bool {
+	return isChannelSessionBlocked(c, ch, sessionID)
+}
+
+func selectChannelWithSessionCheckUsingSelector(
+	c *gin.Context,
+	modelName string,
+	tokenGroup string,
+	sessionID string,
+	selector func(retry int) (*model.Channel, string, error),
+	blocked func(ch *model.Channel, sessionID string) bool,
+) (*model.Channel, string, error) {
+	lastGroup := tokenGroup
+	for retry := 0; retry < maxSessionRetryLevels; retry++ {
+		ch, grp, err := selector(retry)
+		if grp != "" {
+			lastGroup = grp
+		}
+		if err != nil {
+			return nil, grp, err
+		}
+		if ch == nil {
+			return nil, grp, nil
+		}
+		if blocked(ch, sessionID) {
+			return nil, grp, newChannelSessionLimitError(c, ch)
+		}
+		return ch, grp, nil
+	}
+	return nil, lastGroup, nil
+}
+
+// selectChannelWithSessionCheck wraps CacheGetRandomSatisfiedChannel with session limit awareness.
+// It still walks retry levels to find a candidate, but once a Claude channel is selected and found full
+// for a new session, it returns an immediate error instead of falling back to another Claude channel.
+func selectChannelWithSessionCheck(c *gin.Context, modelName string, tokenGroup string, sessionID string) (*model.Channel, string, error) {
+	return selectChannelWithSessionCheckUsingSelector(
+		c,
+		modelName,
+		tokenGroup,
+		sessionID,
+		func(retry int) (*model.Channel, string, error) {
+			return service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
+				Ctx:        c,
+				ModelName:  modelName,
+				TokenGroup: tokenGroup,
+				Retry:      common.GetPointer(retry),
+			})
+		},
+		func(ch *model.Channel, sessionID string) bool {
+			return isChannelSessionBlocked(c, ch, sessionID)
+		},
+	)
+}
+
+// registerSessionIfNeeded registers or refreshes the session in Redis after a successful relay.
+func registerSessionIfNeeded(c *gin.Context, ch *model.Channel) {
+	if ch.Type != constant.ChannelTypeAnthropic {
+		return
+	}
+	otherSettings := ch.GetOtherSettings()
+	if otherSettings.GetClaudeMaxSessions() <= 0 {
+		return
+	}
+	sessionID := common.GetContextKeyString(c, constant.ContextKeySessionId)
+	if sessionID == "" {
+		return
+	}
+	if err := service.RegisterOrUpdateSession(ch.Id, sessionID); err != nil {
+		common.SysError(fmt.Sprintf("failed to register session for channel %d: %v", ch.Id, err))
+	}
 }
