@@ -40,6 +40,7 @@ import { useClaudeChannelSessionStream } from './useClaudeChannelSessionStream';
 import { parseUpstreamUpdateMeta } from './upstreamUpdateUtils';
 import { Modal, Button } from '@douyinfe/semi-ui';
 import { openCodexUsageModal } from '../../components/table/channels/modals/CodexUsageModal';
+import { openCodingPlanUsageModal } from '../../components/table/channels/modals/CodingPlanUsageModal';
 
 export const useChannelsData = () => {
   const { t } = useTranslation();
@@ -779,6 +780,14 @@ export const useChannelsData = () => {
   };
 
   const updateChannelBalance = async (record) => {
+    if ([58, 59].includes(record?.type)) {
+      openCodingPlanUsageModal({
+        t,
+        record,
+      });
+      return;
+    }
+
     if (record?.type === 57) {
       openCodexUsageModal({
         t,
