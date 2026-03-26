@@ -2,7 +2,6 @@ package coding_plan
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -86,11 +85,7 @@ func RefreshChannelUsage(channelId int) (*CodingPlanUsage, error) {
 		return nil, fmt.Errorf("渠道没有配置 API Key")
 	}
 
-	// 解码 base64 key（渠道 key 存储时可能被编码）
 	apiKey := keys[0]
-	if decoded, err := base64.StdEncoding.DecodeString(apiKey); err == nil {
-		apiKey = string(decoded)
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	usage, err := provider.GetUsage(ctx, apiKey)

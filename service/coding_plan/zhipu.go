@@ -56,7 +56,7 @@ func (p *ZhipuCodingPlanProvider) GetUsage(ctx context.Context, apiKey string) (
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1MB limit
 	if err != nil {
 		return nil, fmt.Errorf("read response failed: %w", err)
 	}
