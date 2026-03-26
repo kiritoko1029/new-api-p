@@ -40,9 +40,10 @@ const buildStreamUrl = ({ channelId, channelIds, details }) => {
   const params = new URLSearchParams();
   if (channelId) {
     params.set('channel_id', String(channelId));
-  } else if (channelIds.length > 0) {
+  } else if (channelIds && channelIds.length > 0) {
     params.set('channel_ids', channelIds.join(','));
   }
+  // If channelIds is undefined or empty, fetch ALL channels (no channel_ids param)
   if (details) {
     params.set('details', 'true');
   }
@@ -84,7 +85,9 @@ export const useClaudeChannelSessionStream = ({
       setSessionStateMap({});
       return undefined;
     }
-    if (!normalizedChannelId && normalizedChannelIds.length === 0) {
+    // Only skip if channelIds is explicitly undefined (not passed at all)
+    // An empty channelIds array [] means "fetch all channels" for the dashboard
+    if (!normalizedChannelId && channelIds === undefined) {
       setSessionStateMap({});
       return undefined;
     }

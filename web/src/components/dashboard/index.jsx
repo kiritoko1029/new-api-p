@@ -30,6 +30,7 @@ import AnnouncementsPanel from './AnnouncementsPanel';
 import FaqPanel from './FaqPanel';
 import UptimePanel from './UptimePanel';
 import SearchModal from './modals/SearchModal';
+import DashboardChannelSessionPanel from './DashboardChannelSessionPanel';
 
 import { useDashboardData } from '../../hooks/dashboard/useDashboardData';
 import { useDashboardStats } from '../../hooks/dashboard/useDashboardStats';
@@ -201,6 +202,14 @@ const Dashboard = () => {
             />
           )}
         </div>
+      </div>
+
+      {/* 渠道会话状态面板 */}
+      <div className='mb-4'>
+        <DashboardChannelSessionPanel
+          CARD_PROPS={CARD_PROPS}
+          t={dashboardData.t}
+        />
       </div>
 
       {/* 系统公告和常见问答卡片 */}

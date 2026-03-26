@@ -335,7 +335,9 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 	if sessionID != "" && channel.Type == constant.ChannelTypeAnthropic {
 		otherSettings := channel.GetOtherSettings()
 		if otherSettings.GetClaudeMaxSessions() > 0 {
-			if regErr := service.RegisterOrUpdateSession(channel.Id, sessionID); regErr != nil {
+			username := common.GetContextKeyString(c, constant.ContextKeyUserName)
+			maskedUsername := service.MaskUsername(username)
+			if regErr := service.RegisterOrUpdateSession(channel.Id, sessionID, maskedUsername); regErr != nil {
 				common.SysError(fmt.Sprintf("failed to register session for channel %d during retry: %v", channel.Id, regErr))
 			}
 		}

@@ -587,7 +587,9 @@ func registerSessionIfNeeded(c *gin.Context, ch *model.Channel) {
 	if sessionID == "" {
 		return
 	}
-	if err := service.RegisterOrUpdateSession(ch.Id, sessionID); err != nil {
+	username := common.GetContextKeyString(c, constant.ContextKeyUserName)
+	maskedUsername := service.MaskUsername(username)
+	if err := service.RegisterOrUpdateSession(ch.Id, sessionID, maskedUsername); err != nil {
 		common.SysError(fmt.Sprintf("failed to register session for channel %d: %v", ch.Id, err))
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 type ChannelSessionEntry struct {
 	SessionIDMasked  string `json:"session_id_masked"`
+	MaskedUsername  string `json:"masked_username"`
 	LastActiveAt     int64  `json:"last_active_at"`
 	ExpiresAt        int64  `json:"expires_at"`
 	RemainingSeconds int64  `json:"remaining_seconds"`
@@ -39,7 +40,7 @@ func maskSessionID(sessionID string) string {
 	return sessionID[:2] + "..." + sessionID[len(sessionID)-2:]
 }
 
-func buildActiveSessionEntriesFromScores(now time.Time, ttlMinutes int, scoreMap map[string]float64) []ChannelSessionEntry {
+func buildActiveSessionEntriesFromScores(now time.Time, ttlMinutes int, scoreMap map[string]float64, userMap map[string]string) []ChannelSessionEntry {
 	minActiveAt := now.Add(-time.Duration(ttlMinutes) * time.Minute).Unix()
 	nowUnix := now.Unix()
 	entries := make([]ChannelSessionEntry, 0, len(scoreMap))
@@ -56,6 +57,7 @@ func buildActiveSessionEntriesFromScores(now time.Time, ttlMinutes int, scoreMap
 		}
 		entries = append(entries, ChannelSessionEntry{
 			SessionIDMasked:  maskSessionID(sessionID),
+			MaskedUsername:  userMap[sessionID],
 			LastActiveAt:     lastActiveAt,
 			ExpiresAt:        expiresAt,
 			RemainingSeconds: remainingSeconds,
@@ -75,11 +77,11 @@ func buildActiveSessionEntriesFromScores(now time.Time, ttlMinutes int, scoreMap
 	return entries
 }
 
-func buildClaudeChannelSessionState(channel *model.Channel, now time.Time, scoreMap map[string]float64, includeDetails bool) ChannelSessionState {
+func buildClaudeChannelSessionState(channel *model.Channel, now time.Time, scoreMap map[string]float64, userMap map[string]string, includeDetails bool) ChannelSessionState {
 	otherSettings := channel.GetOtherSettings()
 	ttlMinutes := otherSettings.GetClaudeSessionTTLMinutes()
 	maxSessions := otherSettings.GetClaudeMaxSessions()
-	entries := buildActiveSessionEntriesFromScores(now, ttlMinutes, scoreMap)
+	entries := buildActiveSessionEntriesFromScores(now, ttlMinutes, scoreMap, userMap)
 
 	state := ChannelSessionState{
 		ChannelID:      channel.Id,
@@ -112,7 +114,8 @@ func BuildClaudeChannelSessionStreamPayload(channelIDs []int, includeDetails boo
 		otherSettings := channel.GetOtherSettings()
 		ttlMinutes := otherSettings.GetClaudeSessionTTLMinutes()
 		scoreMap := GetChannelSessionScoreMap(channel.Id, ttlMinutes)
-		states = append(states, buildClaudeChannelSessionState(channel, now, scoreMap, includeDetails))
+		userMap := GetChannelSessionUserMap(channel.Id)
+		states = append(states, buildClaudeChannelSessionState(channel, now, scoreMap, userMap, includeDetails))
 	}
 
 	sort.Slice(states, func(i, j int) bool {

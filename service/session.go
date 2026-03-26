@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	channelSessionsPrefix = "channel_sessions:"
+	channelSessionsPrefix  = "channel_sessions:"
+	channelSessionUsersPrefix = "channel_session_users:"
 	// maxSessionContentLen limits the first user message content used for session ID hashing.
 	// Truncating avoids unnecessarily large hash inputs while maintaining uniqueness.
 	maxSessionContentLen = 500
@@ -106,6 +107,36 @@ func sessionRedisKey(channelID int) string {
 	return channelSessionsPrefix + strconv.Itoa(channelID)
 }
 
+// sessionUsersRedisKey returns the Redis hash key for storing session -> masked username mapping.
+func sessionUsersRedisKey(channelID int) string {
+	return channelSessionUsersPrefix + strconv.Itoa(channelID)
+}
+
+// MaskUsername masks a username for display.
+// For 2-char names: first char is replaced with *, e.g., "张三" -> "*三"
+// For names with 3+ chars: middle characters are replaced with *, e.g., "张三丰" -> "张*丰"
+func MaskUsername(username string) string {
+	if username == "" {
+		return ""
+	}
+	runes := []rune(username)
+	length := len(runes)
+
+	if length == 1 {
+		return "*"
+	}
+	if length == 2 {
+		// 2-char: replace first char with *
+		return "*" + string(runes[1])
+	}
+	// 3+ chars: replace middle characters with *
+	if length == 3 {
+		return string(runes[0]) + "*" + string(runes[2])
+	}
+	// For longer names, mask the middle portion
+	return string(runes[0]) + strings.Repeat("*", length-2) + string(runes[length-1])
+}
+
 // GetChannelActiveSessionCount returns the number of active (non-expired) sessions for a channel.
 // Returns 0 if Redis is not enabled or an error occurs.
 func GetChannelActiveSessionCount(channelID int, ttlMinutes int) int {
@@ -160,6 +191,22 @@ func GetChannelSessionScoreMap(channelID int, ttlMinutes int) map[string]float64
 	return scoreMap
 }
 
+// GetChannelSessionUserMap returns the active session -> masked username map for a channel.
+func GetChannelSessionUserMap(channelID int) map[string]string {
+	if !common.RedisEnabled || common.RDB == nil {
+		return map[string]string{}
+	}
+	ctx := context.Background()
+	usersKey := sessionUsersRedisKey(channelID)
+
+	result, err := common.RDB.HGetAll(ctx, usersKey).Result()
+	if err != nil {
+		common.SysError("failed to get session user map: " + err.Error())
+		return map[string]string{}
+	}
+	return result
+}
+
 // IsSessionActive checks whether a specific session exists on a channel and is still active (non-expired).
 func IsSessionActive(channelID int, sessionID string, ttlMinutes int) bool {
 	if !common.RedisEnabled || common.RDB == nil || sessionID == "" {
@@ -178,17 +225,23 @@ func IsSessionActive(channelID int, sessionID string, ttlMinutes int) bool {
 
 // RegisterOrUpdateSession adds or refreshes a session for a channel in Redis.
 // The session's score (timestamp) is updated to the current time.
-func RegisterOrUpdateSession(channelID int, sessionID string) error {
+// It also stores the masked username in a separate hash for display purposes.
+func RegisterOrUpdateSession(channelID int, sessionID string, maskedUsername string) error {
 	if !common.RedisEnabled || common.RDB == nil || sessionID == "" {
 		return nil
 	}
 	ctx := context.Background()
 	key := sessionRedisKey(channelID)
+	usersKey := sessionUsersRedisKey(channelID)
 	now := float64(time.Now().Unix())
 
 	_, err := common.RDB.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		pipe.ZAdd(ctx, key, &redis.Z{Score: now, Member: sessionID})
 		pipe.Expire(ctx, key, sessionKeyTTL)
+		if maskedUsername != "" {
+			pipe.HSet(ctx, usersKey, sessionID, maskedUsername)
+			pipe.Expire(ctx, usersKey, sessionKeyTTL)
+		}
 		return nil
 	})
 	return err
