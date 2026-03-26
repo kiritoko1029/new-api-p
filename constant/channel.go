@@ -54,7 +54,9 @@ const (
 	ChannelTypeDoubaoVideo    = 54
 	ChannelTypeSora           = 55
 	ChannelTypeReplicate      = 56
-	ChannelTypeCodex          = 57
+	ChannelTypeCodex                       = 57
+	ChannelTypeZhipuCodingPlan             = 58 // 智谱编程套餐（国内）
+	ChannelTypeZhipuCodingPlanInternational = 59 // 智谱编程套餐（国际版）
 	ChannelTypeDummy          // this one is only for count, do not add any channel after this
 
 )
@@ -118,6 +120,8 @@ var ChannelBaseURLs = []string{
 	"https://api.openai.com",                    //55
 	"https://api.replicate.com",                 //56
 	"https://chatgpt.com",                       //57
+	"https://open.bigmodel.cn",                  //58 - 智谱编程套餐国内
+	"https://api.z.ai",                          //59 - 智谱编程套餐国际版
 }
 
 var ChannelTypeNames = map[int]string{
@@ -175,6 +179,8 @@ var ChannelTypeNames = map[int]string{
 	ChannelTypeSora:           "Sora",
 	ChannelTypeReplicate:      "Replicate",
 	ChannelTypeCodex:          "Codex",
+	ChannelTypeZhipuCodingPlan:             "ZhipuCodingPlan",
+	ChannelTypeZhipuCodingPlanInternational: "ZhipuCodingPlanInternational",
 }
 
 func GetChannelTypeName(channelType int) string {
