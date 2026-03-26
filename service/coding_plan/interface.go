@@ -2,6 +2,8 @@ package coding_plan
 
 import (
 	"context"
+
+	"github.com/QuantumNous/new-api/common"
 )
 
 // CodingPlanUsage 编程套餐用量信息
@@ -59,4 +61,13 @@ func IsCodingPlanChannel(channelType int) bool {
 	default:
 		return false
 	}
+}
+
+// MarshalUsage 将 CodingPlanUsage 序列化为 JSON 字符串
+func MarshalUsage(usage *CodingPlanUsage) (string, error) {
+	data, err := common.Marshal(usage)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
