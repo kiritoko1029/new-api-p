@@ -34,6 +34,8 @@ type Channel struct {
 	Other              string  `json:"other"`
 	Balance            float64 `json:"balance"` // in USD
 	BalanceUpdatedTime int64   `json:"balance_updated_time" gorm:"bigint"`
+	CodingPlanUsage         string `json:"coding_plan_usage" gorm:"type:text;default:''"`              // 编程套餐用量信息（JSON）
+	CodingPlanUsageUpdatedTime int64  `json:"coding_plan_usage_updated_time" gorm:"bigint;default:0"` // 编程套餐用量更新时间
 	Models             string  `json:"models"`
 	Group              string  `json:"group" gorm:"type:varchar(64);default:'default'"`
 	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
@@ -1005,4 +1007,26 @@ func CountChannelsGroupByType() (map[int64]int64, error) {
 		counts[r.Type] = r.Count
 	}
 	return counts, nil
+}
+
+// GetCodingPlanChannels 获取所有编程套餐类型的渠道
+func GetCodingPlanChannels() ([]*Channel, error) {
+	var channels []*Channel
+	err := DB.Where("type IN ?", []int{58, 59}).Find(&channels).Error
+	return channels, err
+}
+
+// GetCodingPlanChannelById 根据ID获取编程套餐渠道
+func GetCodingPlanChannelById(id int) (*Channel, error) {
+	var channel Channel
+	err := DB.Where("id = ? AND type IN ?", id, []int{58, 59}).First(&channel).Error
+	return &channel, err
+}
+
+// UpdateChannelCodingPlanUsage 更新渠道的编程套餐用量信息
+func UpdateChannelCodingPlanUsage(id int, usageJSON string) error {
+	return DB.Model(&Channel{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"coding_plan_usage":            usageJSON,
+		"coding_plan_usage_updated_time": common.GetTimestamp(),
+	}).Error
 }
