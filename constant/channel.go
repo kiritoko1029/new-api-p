@@ -57,6 +57,7 @@ const (
 	ChannelTypeCodex                       = 57
 	ChannelTypeZhipuCodingPlan             = 58 // 智谱编程套餐（国内）
 	ChannelTypeZhipuCodingPlanInternational = 59 // 智谱编程套餐（国际版）
+	ChannelTypeMiniMaxCodingPlan            = 60 // MiniMax编程套餐
 	ChannelTypeDummy          // this one is only for count, do not add any channel after this
 
 )
@@ -122,6 +123,7 @@ var ChannelBaseURLs = []string{
 	"https://chatgpt.com",                       //57
 	"https://open.bigmodel.cn",                  //58 - 智谱编程套餐国内
 	"https://api.z.ai",                          //59 - 智谱编程套餐国际版
+	"https://api.minimaxi.com",                  //60 - MiniMax编程套餐
 }
 
 var ChannelTypeNames = map[int]string{
@@ -181,6 +183,7 @@ var ChannelTypeNames = map[int]string{
 	ChannelTypeCodex:          "Codex",
 	ChannelTypeZhipuCodingPlan:             "ZhipuCodingPlan",
 	ChannelTypeZhipuCodingPlanInternational: "ZhipuCodingPlanInternational",
+	ChannelTypeMiniMaxCodingPlan:            "MiniMaxCodingPlan",
 }
 
 func GetChannelTypeName(channelType int) string {

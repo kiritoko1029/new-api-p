@@ -56,7 +56,7 @@ type CodingPlanProvider interface {
 // IsCodingPlanChannel 判断是否为编程套餐渠道类型
 func IsCodingPlanChannel(channelType int) bool {
 	switch channelType {
-	case 58, 59: // ChannelTypeZhipuCodingPlan, ChannelTypeZhipuCodingPlanInternational
+	case 58, 59, 60: // ChannelTypeZhipuCodingPlan, ChannelTypeZhipuCodingPlanInternational, ChannelTypeMiniMaxCodingPlan
 		return true
 	default:
 		return false

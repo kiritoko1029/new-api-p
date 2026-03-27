@@ -444,16 +444,17 @@ export const useChannelsData = () => {
   const upstreamUpdates = useChannelUpstreamUpdates({ t, refresh });
   const claudeChannelIds = useMemo(() => {
     const ids = [];
+    const sessionChannelTypes = [14, 58, 59, 60];
     channels.forEach((channel) => {
       if (Array.isArray(channel?.children)) {
         channel.children.forEach((child) => {
-          if (Number(child?.type) === 14) {
+          if (sessionChannelTypes.includes(Number(child?.type))) {
             ids.push(child.id);
           }
         });
         return;
       }
-      if (Number(channel?.type) === 14) {
+      if (sessionChannelTypes.includes(Number(channel?.type))) {
         ids.push(channel.id);
       }
     });
@@ -780,7 +781,7 @@ export const useChannelsData = () => {
   };
 
   const updateChannelBalance = async (record) => {
-    if ([58, 59].includes(record?.type)) {
+    if ([58, 59, 60].includes(record?.type)) {
       openCodingPlanUsageModal({
         t,
         record,

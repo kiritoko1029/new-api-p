@@ -543,8 +543,11 @@ const EditChannelModal = (props) => {
       formApiRef.current.setValue('settings', settingsJson);
     }
 
-    // 同步更新inputs状态
-    setInputs((prev) => ({ ...prev, [key]: value, settings: settingsJson }));
+    // 同步更新inputs状态 - 使用函数式更新避免闭包捕获陈旧状态
+    setInputs((prev) => {
+      const updatedInputs = { ...prev, [key]: value, settings: settingsJson };
+      return updatedInputs;
+    });
   };
 
   const isIonetLocked = isIonetChannel && isEdit;
@@ -2599,7 +2602,7 @@ const EditChannelModal = (props) => {
                     {t('额外设置')}
                   </Text>
 
-                  {inputs.type === 14 && (
+                  {([14, 58, 59, 60].includes(inputs.type)) && (
                     <>
                       <Form.Switch
                         field='claude_beta_query'
@@ -2656,7 +2659,11 @@ const EditChannelModal = (props) => {
                         channelId={channelId}
                         fallbackMaxSessions={inputs.claude_max_sessions}
                         fallbackTtlMinutes={inputs.claude_session_ttl_minutes}
-                        visible={isEdit && props.visible && inputs.type === 14}
+                        visible={
+                          isEdit &&
+                          props.visible &&
+                          [14, 58, 59, 60].includes(inputs.type)
+                        }
                       />
                     </>
                   )}

@@ -69,6 +69,8 @@ func ChannelType2APIType(channelType int) (int, bool) {
 		apiType = constant.APITypeAnthropic
 	case constant.ChannelTypeZhipuCodingPlanInternational:
 		apiType = constant.APITypeAnthropic
+	case constant.ChannelTypeMiniMaxCodingPlan:
+		apiType = constant.APITypeAnthropic
 	case constant.ChannelTypeMoonshot:
 		apiType = constant.APITypeMoonshot
 	case constant.ChannelTypeSubmodel:

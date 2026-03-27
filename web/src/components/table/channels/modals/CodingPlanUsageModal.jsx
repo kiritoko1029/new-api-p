@@ -109,7 +109,11 @@ const CodingPlanUsageView = ({ t, record, initialUsage }) => {
                       ? t('工具使用限制')
                       : limit.type === 'TOKENS_LIMIT'
                         ? t('词元余量')
-                        : limit.type}
+                        : limit.type.startsWith('INTERVAL_')
+                          ? t('区间用量')
+                          : limit.type.startsWith('WEEKLY_')
+                            ? t('周用量')
+                            : limit.type}
                   </Title>
                   <Descriptions row>
                     <Descriptions.Item itemKey={t('总限额')}>
@@ -179,13 +183,15 @@ const CodingPlanUsageView = ({ t, record, initialUsage }) => {
 export const openCodingPlanUsageModal = ({ t, record }) => {
   const tt = typeof t === 'function' ? t : (v) => v;
 
+  let planName = tt('智谱编程套餐(国际版)');
+  if (record?.type === 58) {
+    planName = tt('智谱编程套餐');
+  } else if (record?.type === 60) {
+    planName = tt('MiniMax编程套餐');
+  }
+
   Modal.info({
-    title:
-      (record?.name || '') +
-      ' - ' +
-      (record?.type === 58
-        ? tt('智谱编程套餐')
-        : tt('智谱编程套餐(国际版)')),
+    title: (record?.name || '') + ' - ' + planName,
     centered: true,
     width: 700,
     style: { maxWidth: '95vw' },

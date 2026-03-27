@@ -39,4 +39,6 @@ func init() {
 	RegisterProvider(58, NewZhipuCodingPlanProvider(false))
 	// 注册智谱编程套餐（国际版）
 	RegisterProvider(59, NewZhipuCodingPlanProvider(true))
+	// 注册MiniMax编程套餐
+	RegisterProvider(60, NewMiniMaxCodingPlanProvider())
 }

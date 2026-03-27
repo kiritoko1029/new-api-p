@@ -199,6 +199,11 @@ export const CHANNEL_OPTIONS = [
     color: 'cyan',
     label: '智谱编程套餐(国际版)',
   },
+  {
+    value: 60,
+    color: 'cyan',
+    label: 'MiniMax编程套餐',
+  },
 ];
 
 // Channel types that support upstream model list fetching in UI.

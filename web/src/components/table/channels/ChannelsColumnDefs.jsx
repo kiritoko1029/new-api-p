@@ -262,7 +262,7 @@ const renderSessionSummary = (record, channelSessionStateMap, t) => {
     );
   }
 
-  if (Number(record?.type) !== 14) {
+  if (![14, 58, 59, 60].includes(Number(record?.type))) {
     return (
       <Tag color='grey' type='ghost' shape='circle'>
         -
@@ -612,7 +612,7 @@ export const getChannelsColumns = ({
                 </Tooltip>
                 <Tooltip
                   content={
-                    [57, 58, 59].includes(record.type)
+                    [57, 58, 59, 60].includes(record.type)
                       ? record.type === 57
                         ? t('查看 Codex 帐号信息与用量')
                         : t('查看编程套餐用量')
@@ -623,10 +623,10 @@ export const getChannelsColumns = ({
                   }
                 >
                   <Tag
-                    color={[57, 58, 59].includes(record.type) ? 'light-blue' : 'white'}
-                    type={[57, 58, 59].includes(record.type) ? 'light' : 'ghost'}
+                    color={[57, 58, 59, 60].includes(record.type) ? 'light-blue' : 'white'}
+                    type={[57, 58, 59, 60].includes(record.type) ? 'light' : 'ghost'}
                     shape='circle'
-                    className={[57, 58, 59].includes(record.type) ? 'cursor-pointer' : ''}
+                    className={[57, 58, 59, 60].includes(record.type) ? 'cursor-pointer' : ''}
                     onClick={() => updateChannelBalance(record)}
                   >
                     {record.type === 57
