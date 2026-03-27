@@ -187,16 +187,19 @@ func SetApiRouter(router *gin.Engine) {
 			customOAuthRoute.PUT("/:id", controller.UpdateCustomOAuthProvider)
 			customOAuthRoute.DELETE("/:id", controller.DeleteCustomOAuthProvider)
 		}
-		performanceRoute := apiRouter.Group("/performance")
-		performanceRoute.Use(middleware.RootAuth())
-		{
-			performanceRoute.GET("/stats", controller.GetPerformanceStats)
-			performanceRoute.DELETE("/disk_cache", controller.ClearDiskCache)
-			performanceRoute.POST("/reset_stats", controller.ResetPerformanceStats)
-			performanceRoute.POST("/gc", controller.ForceGC)
-			performanceRoute.GET("/logs", controller.GetLogFiles)
-			performanceRoute.DELETE("/logs", controller.CleanupLogFiles)
-		}
+		// NOTE: The following performanceRoute group references non-existent controllers
+		// and is commented out to allow compilation. These routes may need to be
+		// implemented or removed if no longer needed.
+		// performanceRoute := apiRouter.Group("/performance")
+		// performanceRoute.Use(middleware.RootAuth())
+		// {
+		// 	performanceRoute.GET("/stats", controller.GetPerformanceStats)
+		// 	performanceRoute.DELETE("/disk_cache", controller.ClearDiskCache)
+		// 	performanceRoute.POST("/reset_stats", controller.ResetPerformanceStats)
+		// 	performanceRoute.POST("/gc", controller.ForceGC)
+		// 	performanceRoute.GET("/logs", controller.GetLogFiles)
+		// 	performanceRoute.DELETE("/logs", controller.CleanupLogFiles)
+		// }
 		ratioSyncRoute := apiRouter.Group("/ratio_sync")
 		ratioSyncRoute.Use(middleware.RootAuth())
 		{
@@ -297,6 +300,12 @@ func SetApiRouter(router *gin.Engine) {
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)
 		dataRoute.GET("/self", middleware.UserAuth(), controller.GetUserQuotaDates)
+
+		modelPerfRoute := apiRouter.Group("/model_perf")
+		modelPerfRoute.Use(middleware.AdminAuth())
+		{
+			modelPerfRoute.GET("/performance", controller.GetModelPerformance)
+		}
 
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{

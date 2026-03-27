@@ -259,6 +259,69 @@ export const useDashboardCharts = (
     },
   });
 
+  // 模型性能柱状图
+  const [spec_performance, setSpecPerformance] = useState({
+    type: 'bar',
+    data: [
+      {
+        id: 'perfData',
+        values: [],
+      },
+    ],
+    xField: 'model_name',
+    yField: 'combined_score',
+    seriesField: 'model_name',
+    legends: {
+      visible: false,
+    },
+    title: {
+      visible: true,
+      text: t('模型性能分析'),
+      subtext: '',
+    },
+    bar: {
+      state: {
+        hover: {
+          stroke: '#000',
+          lineWidth: 1,
+        },
+      },
+    },
+    tooltip: {
+      mark: {
+        content: [
+          {
+            key: (datum) => datum['model_name'],
+            value: (datum) => datum['combined_score']?.toFixed(2) || '-',
+          },
+        ],
+      },
+      dimension: {
+        content: [
+          {
+            key: (datum) => t('TTFT中位数'),
+            value: (datum) => (datum['median_ttft'] || 0).toFixed(2) + ' ms',
+          },
+          {
+            key: (datum) => t('TPS中位数'),
+            value: (datum) => (datum['median_tps'] || 0).toFixed(2) + ' t/s',
+          },
+          {
+            key: (datum) => t('综合评分'),
+            value: (datum) => (datum['combined_score'] || 0).toFixed(2),
+          },
+          {
+            key: (datum) => t('样本数'),
+            value: (datum) => datum['sample_count'] || 0,
+          },
+        ],
+      },
+    },
+    color: {
+      specified: modelColorMap,
+    },
+  });
+
   // ========== 数据处理函数 ==========
   const generateModelColors = useCallback((uniqueModels, modelColors) => {
     const newModelColors = {};
@@ -439,6 +502,8 @@ export const useDashboardCharts = (
     spec_line,
     spec_model_line,
     spec_rank_bar,
+    spec_performance,
+    setSpecPerformance,
 
     // 函数
     updateChartData,

@@ -131,7 +131,7 @@ func BuildClaudeChannelSessionStreamPayload(channelIDs []int, includeDetails boo
 func getClaudeChannelsForSessionState(channelIDs []int) ([]*model.Channel, error) {
 	if len(channelIDs) == 0 {
 		channels := make([]*model.Channel, 0)
-		err := model.DB.Where("type = ?", constant.ChannelTypeAnthropic).Find(&channels).Error
+		err := model.DB.Where("type IN ?", []int{constant.ChannelTypeAnthropic, constant.ChannelTypeZhipuCodingPlan, constant.ChannelTypeZhipuCodingPlanInternational}).Find(&channels).Error
 		return channels, err
 	}
 
@@ -142,7 +142,12 @@ func getClaudeChannelsForSessionState(channelIDs []int) ([]*model.Channel, error
 
 	filtered := make([]*model.Channel, 0, len(channels))
 	for _, channel := range channels {
-		if channel == nil || channel.Type != constant.ChannelTypeAnthropic {
+		if channel == nil {
+			continue
+		}
+		if channel.Type != constant.ChannelTypeAnthropic &&
+			channel.Type != constant.ChannelTypeZhipuCodingPlan &&
+			channel.Type != constant.ChannelTypeZhipuCodingPlanInternational {
 			continue
 		}
 		filtered = append(filtered, channel)

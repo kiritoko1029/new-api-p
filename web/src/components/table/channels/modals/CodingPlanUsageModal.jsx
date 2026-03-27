@@ -106,11 +106,13 @@ const CodingPlanUsageView = ({ t, record, initialUsage }) => {
                 >
                   <Title heading={6}>
                     {limit.type === 'TIME_LIMIT'
-                      ? t('时间限制')
-                      : limit.type}
+                      ? t('工具使用限制')
+                      : limit.type === 'TOKENS_LIMIT'
+                        ? t('词元余量')
+                        : limit.type}
                   </Title>
                   <Descriptions row>
-                    <Descriptions.Item itemKey={t('限额')}>
+                    <Descriptions.Item itemKey={t('总限额')}>
                       {limit.usage} {t('次')}
                     </Descriptions.Item>
                     <Descriptions.Item itemKey={t('已使用')}>

@@ -71,13 +71,18 @@ func (p *ZhipuCodingPlanProvider) GetUsage(ctx context.Context, apiKey string) (
 		return nil, fmt.Errorf("parse response failed: %w", err)
 	}
 
+	// 检查 API 返回状态
+	if !zhipuResp.Success || zhipuResp.Code != 200 {
+		return nil, fmt.Errorf("API error: code=%d, msg=%s", zhipuResp.Code, zhipuResp.Msg)
+	}
+
 	// 转换为通用格式
 	usage := &CodingPlanUsage{
-		Level:     zhipuResp.Level,
+		Level:     zhipuResp.Data.Level,
 		QueryTime: time.Now().UnixMilli(),
 	}
 
-	for _, limit := range zhipuResp.Limits {
+	for _, limit := range zhipuResp.Data.Limits {
 		planLimit := CodingPlanLimit{
 			Type:          limit.Type,
 			Unit:          limit.Unit,
@@ -117,19 +122,24 @@ func (p *ZhipuCodingPlanProvider) GetChannelType() int {
 
 // zhipuQuotaLimitResponse 智谱配额限制响应结构
 type zhipuQuotaLimitResponse struct {
-	Limits []struct {
-		Type          string `json:"type"`
-		Unit          int    `json:"unit"`
-		Number        int    `json:"number"`
-		Usage         int    `json:"usage"`
-		CurrentValue  int    `json:"currentValue"`
-		Remaining     int    `json:"remaining"`
-		Percentage    int    `json:"percentage"`
-		NextResetTime int64  `json:"nextResetTime"`
-		UsageDetails  []struct {
-			ModelCode string `json:"modelCode"`
-			Usage     int    `json:"usage"`
-		} `json:"usageDetails"`
-	} `json:"limits"`
-	Level string `json:"level"`
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Success bool   `json:"success"`
+	Data    struct {
+		Limits []struct {
+			Type          string `json:"type"`
+			Unit          int    `json:"unit"`
+			Number        int    `json:"number"`
+			Usage         int    `json:"usage"`
+			CurrentValue  int    `json:"currentValue"`
+			Remaining     int    `json:"remaining"`
+			Percentage    int    `json:"percentage"`
+			NextResetTime int64  `json:"nextResetTime"`
+			UsageDetails  []struct {
+				ModelCode string `json:"modelCode"`
+				Usage     int    `json:"usage"`
+			} `json:"usageDetails"`
+		} `json:"limits"`
+		Level string `json:"level"`
+	} `json:"data"`
 }

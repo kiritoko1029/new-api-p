@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, Tabs, TabPane } from '@douyinfe/semi-ui';
 import { PieChart } from 'lucide-react';
 import { VChart } from '@visactor/react-vchart';
@@ -29,12 +29,28 @@ const ChartsPanel = ({
   spec_model_line,
   spec_pie,
   spec_rank_bar,
+  spec_performance,
+  modelPerformanceData,
   CARD_PROPS,
   CHART_CONFIG,
   FLEX_CENTER_GAP2,
   hasApiInfoPanel,
   t,
 }) => {
+  // Create performance spec with actual data
+  const performanceSpec = useMemo(() => {
+    if (!spec_performance) return null;
+    return {
+      ...spec_performance,
+      data: [
+        {
+          id: 'perfData',
+          values: modelPerformanceData || [],
+        },
+      ],
+    };
+  }, [spec_performance, modelPerformanceData]);
+
   return (
     <Card
       {...CARD_PROPS}
@@ -54,6 +70,7 @@ const ChartsPanel = ({
             <TabPane tab={<span>{t('消耗趋势')}</span>} itemKey='2' />
             <TabPane tab={<span>{t('调用次数分布')}</span>} itemKey='3' />
             <TabPane tab={<span>{t('调用次数排行')}</span>} itemKey='4' />
+            <TabPane tab={<span>{t('模型性能')}</span>} itemKey='5' />
           </Tabs>
         </div>
       }
@@ -71,6 +88,9 @@ const ChartsPanel = ({
         )}
         {activeChartTab === '4' && (
           <VChart spec={spec_rank_bar} option={CHART_CONFIG} />
+        )}
+        {activeChartTab === '5' && performanceSpec && (
+          <VChart spec={performanceSpec} option={CHART_CONFIG} />
         )}
       </div>
     </Card>

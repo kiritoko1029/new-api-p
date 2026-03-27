@@ -60,6 +60,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const [pieData, setPieData] = useState([{ type: 'null', value: '0' }]);
   const [lineData, setLineData] = useState([]);
   const [modelColors, setModelColors] = useState({});
+  const [modelPerformanceData, setModelPerformanceData] = useState([]);
 
   // ========== 图表状态 ==========
   const [activeChartTab, setActiveChartTab] = useState('1');
@@ -213,6 +214,23 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     }
   }, [activeUptimeTab]);
 
+  const loadModelPerformanceData = useCallback(async () => {
+    if (!isAdminUser) return;
+    try {
+      const { start_timestamp, end_timestamp } = inputs;
+      const localStartTimestamp = Date.parse(start_timestamp) / 1000;
+      const localEndTimestamp = Date.parse(end_timestamp) / 1000;
+      const url = `/api/model_perf/performance?start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}`;
+      const res = await API.get(url);
+      const { success, data } = res.data;
+      if (success) {
+        setModelPerformanceData(data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, [inputs]);
+
   const getUserData = useCallback(async () => {
     let res = await API.get(`/api/user/self`);
     const { success, message, data } = res.data;
@@ -226,8 +244,9 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const refresh = useCallback(async () => {
     const data = await loadQuotaData();
     await loadUptimeData();
+    await loadModelPerformanceData();
     return data;
-  }, [loadQuotaData, loadUptimeData]);
+  }, [loadQuotaData, loadUptimeData, loadModelPerformanceData]);
 
   const handleSearchConfirm = useCallback(
     async (updateChartDataCallback) => {
@@ -306,12 +325,16 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     faqEnabled,
     uptimeEnabled,
 
+    // 模型性能数据
+    modelPerformanceData,
+
     // 函数
     handleInputChange,
     showSearchModal,
     handleCloseModal,
     loadQuotaData,
     loadUptimeData,
+    loadModelPerformanceData,
     getUserData,
     refresh,
     handleSearchConfirm,
